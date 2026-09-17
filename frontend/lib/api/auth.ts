@@ -53,3 +53,13 @@ export async function login(payload: LoginPayload): Promise<LoginSuccessResponse
 
   return data as LoginSuccessResponse;
 }
+
+export async function logout(token: string): Promise<void> {
+  await fetch(`${API_URL}/api/logout`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
