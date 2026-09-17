@@ -449,3 +449,16 @@ Prazo de entrega sugerido: até 5 dias corridos.
 O teste foi planejado para exigir aproximadamente 8 a 12 horas de desenvolvimento.
 
 Não é necessário implementar funcionalidades além das solicitadas. O foco deve estar na qualidade da solução, nas decisões técnicas e na clareza da implementação.
+
+
+## Como executar o projeto
+
+\`\`\`bash
+cp .env.example .env
+cp backend/.env.example backend/.env
+docker compose up -d --build
+docker compose exec backend php artisan migrate
+\`\`\`
+
+Backend: http://localhost:8000
+Frontend: http://localhost:3000
