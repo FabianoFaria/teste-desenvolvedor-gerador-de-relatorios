@@ -70,3 +70,27 @@ Conventional Commits, pequenos, por responsabilidade:
   na documentação do PR.
 - Apontar ambiguidades de regra de negócio em vez de decidir sozinho.
 - Seguir a convenção de commits ao sugerir mensagens.
+
+## Autenticação
+
+- Sanctum em modo token (Bearer), não cookie/SPA — o frontend Next.js roda em
+  domínio/porta separada do backend, então token é mais simples e direto que
+  CSRF+cookie cross-origin.
+- Não há cadastro público de usuário (fora do escopo do teste). Usuário de teste
+  é criado via `UserSeeder` (ver README para credenciais).
+- Token enviado pelo frontend via header `Authorization: Bearer <token>`,
+  armazenado em memória/estado do client (não em localStorage, para reduzir
+  exposição a XSS — avaliar httpOnly cookie como melhoria futura).
+
+## Convenção de UI (frontend)
+
+- Tailwind CSS + shadcn/ui como biblioteca de componentes base.
+- Tema claro, paleta neutra (slate/zinc) com uma cor de destaque única para
+  ações primárias (botões, links ativos).
+- Layout autenticado: sidebar fixa (navegação) + topbar (usuário logado/logout)
+  + área de conteúdo central.
+- Sem tela de registro de usuário — apenas login.
+- Prioridade: organização, responsividade e componentização sobre refinamento
+  visual (conforme README do teste). Componentes reutilizáveis para: tabela
+  paginada, formulário de filtro, card de totalizador, feedback de
+  sucesso/erro (toast).
