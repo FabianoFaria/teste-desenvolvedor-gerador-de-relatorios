@@ -101,3 +101,11 @@ Conventional Commits, pequenos, por responsabilidade:
   cadastro de cliente/cobrança e registro de pagamento, avaliar migrar para
   componente de toast único (sonner, via shadcn/ui) reaproveitado em todo o
   frontend — mais consistente que banners espalhados.
+
+## Trade-off conhecido: persistência de sessão
+
+Como o token fica apenas em memória (React state, não localStorage/cookie),
+um refresh de página (F5) desloga o usuário. Essa é uma escolha deliberada
+para reduzir superfície de ataque XSS. Uma melhoria futura seria usar cookie
+httpOnly setado pelo backend, o que manteria a sessão através de refreshes
+sem expor o token ao JavaScript do client.
