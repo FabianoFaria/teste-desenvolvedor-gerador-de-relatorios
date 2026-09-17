@@ -94,3 +94,10 @@ Conventional Commits, pequenos, por responsabilidade:
   visual (conforme README do teste). Componentes reutilizáveis para: tabela
   paginada, formulário de filtro, card de totalizador, feedback de
   sucesso/erro (toast).
+
+## Decisões adiadas (revisar se sobrar tempo)
+
+- Feedback de erro/sucesso: banners inline usados no login (MVP). Ao implementar
+  cadastro de cliente/cobrança e registro de pagamento, avaliar migrar para
+  componente de toast único (sonner, via shadcn/ui) reaproveitado em todo o
+  frontend — mais consistente que banners espalhados.
