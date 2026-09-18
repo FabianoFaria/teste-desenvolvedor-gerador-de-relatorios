@@ -9,7 +9,10 @@ use App\Models\Customer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Knuckles\Scribe\Attributes\Group;
+use Knuckles\Scribe\Attributes\QueryParam;
 
+#[Group('Clientes', 'Cadastro, edição, listagem e visualização de clientes. Todas as rotas exigem Bearer token.')]
 class CustomerController extends Controller
 {
     /**
@@ -18,6 +21,18 @@ class CustomerController extends Controller
      */
     private const SORTABLE_COLUMNS = ['id', 'name', 'status', 'created_at'];
 
+    /**
+     * Listar clientes
+     *
+     * Listagem paginada no backend, com filtro por status e busca textual
+     * (nome, documento ou e-mail).
+     */
+    #[QueryParam('status', 'string', 'Filtra por status.', required: false, example: 'active', enum: ['active', 'inactive'])]
+    #[QueryParam('search', 'string', 'Busca por nome, documento ou e-mail (contém o termo).', required: false, example: 'Maria')]
+    #[QueryParam('sort_by', 'string', 'Coluna de ordenação.', required: false, example: 'name', enum: ['id', 'name', 'status', 'created_at'])]
+    #[QueryParam('sort_direction', 'string', required: false, example: 'asc', enum: ['asc', 'desc'])]
+    #[QueryParam('page', 'integer', required: false, example: 1)]
+    #[QueryParam('per_page', 'integer', 'Itens por página (máximo 100).', required: false, example: 15)]
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = Customer::query();
@@ -58,11 +73,17 @@ class CustomerController extends Controller
         return CustomerResource::collection($customers);
     }
 
+    /**
+     * Visualizar cliente
+     */
     public function show(Customer $customer): CustomerResource
     {
         return new CustomerResource($customer);
     }
 
+    /**
+     * Cadastrar cliente
+     */
     public function store(StoreCustomerRequest $request): JsonResponse
     {
         $customer = Customer::create($request->validated());
@@ -72,6 +93,9 @@ class CustomerController extends Controller
             ->setStatusCode(201);
     }
 
+    /**
+     * Editar cliente
+     */
     public function update(UpdateCustomerRequest $request, Customer $customer): CustomerResource
     {
         $customer->update($request->validated());

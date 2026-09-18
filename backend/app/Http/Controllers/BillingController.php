@@ -11,7 +11,10 @@ use App\Services\InterestCalculatorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Knuckles\Scribe\Attributes\Group;
+use Knuckles\Scribe\Attributes\QueryParam;
 
+#[Group('Cobranças', 'Cadastro, edição, listagem, visualização e registro de pagamento de cobranças. Todas as rotas exigem Bearer token.')]
 class BillingController extends Controller
 {
     /**
@@ -22,6 +25,19 @@ class BillingController extends Controller
 
     public function __construct(private readonly InterestCalculatorService $interestCalculator) {}
 
+    /**
+     * Listar cobranças
+     *
+     * Listagem paginada no backend, com filtro por cliente e status. Cada
+     * item já inclui os campos calculados de juros/valor atualizado (ver
+     * grupo Relatórios para a mesma lógica aplicada ao relatório completo).
+     */
+    #[QueryParam('customer_id', 'integer', 'Filtra pelas cobranças de um cliente.', required: false, example: 1)]
+    #[QueryParam('status', 'string', required: false, example: 'overdue', enum: ['pending', 'overdue', 'paid', 'cancelled'])]
+    #[QueryParam('sort_by', 'string', required: false, example: 'due_date', enum: ['due_date', 'issue_date', 'status', 'created_at'])]
+    #[QueryParam('sort_direction', 'string', required: false, example: 'asc', enum: ['asc', 'desc'])]
+    #[QueryParam('page', 'integer', required: false, example: 1)]
+    #[QueryParam('per_page', 'integer', 'Itens por página (máximo 100).', required: false, example: 15)]
     public function index(Request $request): AnonymousResourceCollection
     {
         // Eager load explícito — nunca lazy loading implícito, que dispararia
@@ -55,6 +71,12 @@ class BillingController extends Controller
         return BillingResource::collection($billings);
     }
 
+    /**
+     * Visualizar cobrança
+     *
+     * Inclui os campos calculados de juros/valor atualizado em tempo real
+     * (nunca lidos de coluna persistida).
+     */
     public function show(Billing $billing): BillingResource
     {
         // Registro único: sem risco de N+1, mas ainda um load() explícito
@@ -64,6 +86,12 @@ class BillingController extends Controller
         return new BillingResource($billing);
     }
 
+    /**
+     * Cadastrar cobrança
+     *
+     * Toda cobrança nova começa com status `pending` — não é possível criar
+     * já como `paid`/`overdue`/`cancelled` via este endpoint.
+     */
     public function store(StoreBillingRequest $request): JsonResponse
     {
         // 'status' não é um campo aceito do client (nem existe na validação
@@ -82,6 +110,12 @@ class BillingController extends Controller
             ->setStatusCode(201);
     }
 
+    /**
+     * Editar cobrança
+     *
+     * Retorna 422 se a cobrança já estiver paga — uma cobrança paga não
+     * pode ser editada.
+     */
     public function update(UpdateBillingRequest $request, Billing $billing): BillingResource
     {
         $billing->update($request->validated());
@@ -89,6 +123,14 @@ class BillingController extends Controller
         return new BillingResource($billing);
     }
 
+    /**
+     * Registrar pagamento
+     *
+     * Não aceita nenhum campo no corpo da requisição: a data de pagamento é
+     * sempre `now()` e o valor pago é sempre o valor atualizado calculado no
+     * momento do registro — nunca dados enviados pelo client. Retorna 422 se
+     * a cobrança já estiver paga ou cancelada.
+     */
     public function pay(PayBillingRequest $request, Billing $billing): BillingResource
     {
         // Momento único reaproveitado no cálculo e na persistência: a data de

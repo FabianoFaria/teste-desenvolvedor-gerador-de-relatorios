@@ -5,7 +5,9 @@ namespace App\Http\Requests;
 use App\Models\Billing;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
+use Knuckles\Scribe\Attributes\BodyParam;
 
+#[BodyParam('monthly_interest_rate', 'number', 'Taxa de juros mensal em percentual — 2.5 representa 2,5% ao mês, não a fração decimal 0.025.', example: 2.5)]
 class UpdateBillingRequest extends FormRequest
 {
     public function authorize(): bool
