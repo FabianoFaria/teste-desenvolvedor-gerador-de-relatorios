@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -11,7 +11,10 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const NAV_ITEMS: NavItem[] = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }];
+const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/clientes", label: "Clientes", icon: Users },
+];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -23,7 +26,7 @@ export function AppSidebar() {
       </div>
       <nav className="flex flex-1 flex-col gap-1 p-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href;
+          const isActive = pathname === href || pathname.startsWith(`${href}/`);
 
           return (
             <Link
