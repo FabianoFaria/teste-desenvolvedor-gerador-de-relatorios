@@ -124,3 +124,11 @@ O schema e o InterestCalculatorService suportam status 'cancelled' (juros não
 acumulam), mas não há endpoint de cancelamento — não é uma funcionalidade
 pedida no escopo do teste. Implementado de forma defensiva para o caso de
 uma futura extensão (ex: cancelamento manual via admin/seeder).
+
+## Limitação conhecida: seletor de cliente em cadastro/edição de cobrança
+
+O select de cliente carrega até 100 registros via perPage=100. Acima disso,
+alguns clientes não aparecem na lista. Mitigação parcial: ao editar uma
+cobrança existente, o cliente vinculado é sempre injetado nas opções mesmo
+fora da página buscada. Melhoria futura: combobox assíncrono com busca
+server-side (GET /api/customers?search=) via Command+Popover do shadcn/ui.

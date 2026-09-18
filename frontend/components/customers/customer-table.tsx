@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/format";
 import type { Customer, CustomerSortableColumn } from "@/lib/api/customers";
 
 const COLUMN_LABELS: Record<CustomerSortableColumn, string> = {
@@ -72,7 +73,7 @@ export function CustomerTable({ customers, sortBy, sortDirection, onSort }: Cust
                   {customer.status === "active" ? "Ativo" : "Inativo"}
                 </Badge>
               </TableCell>
-              <TableCell>{formatDate(customer.created_at)}</TableCell>
+              <TableCell>{formatDateTime(customer.created_at)}</TableCell>
               <TableCell className="text-right">
                 <Link
                   href={`/clientes/${customer.id}/editar`}
@@ -112,8 +113,4 @@ function SortableTableHead({ column, sortBy, sortDirection, onSort }: SortableTa
       </button>
     </TableHead>
   );
-}
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("pt-BR");
 }
