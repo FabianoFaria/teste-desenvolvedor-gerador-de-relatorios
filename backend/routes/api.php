@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BillingReportController;
+use App\Http\Controllers\BillingReportExportController;
 use App\Http\Controllers\CustomerController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,4 +23,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('billings/{billing}/pay', [BillingController::class, 'pay']);
 
     Route::get('reports/billing', [BillingReportController::class, 'billing']);
+    Route::get('reports/billing/export/csv', [BillingReportExportController::class, 'csv']);
+    Route::get('reports/billing/export/pdf', [BillingReportExportController::class, 'pdf']);
 });

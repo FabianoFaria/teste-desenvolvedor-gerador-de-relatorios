@@ -535,4 +535,99 @@ Docker local):
   `/api/me` leva ~3,3s) — não pelo relatório em si. Em produção (PHP-FPM ou
   Octane, sem reboot do framework por requisição), esse overhead fixo
   desaparece e o tempo de resposta tende ao custo medido acima (~1s).
+
+## Exportação do relatório — CSV e PDF
+
+Ambas reaproveitam `BillingReportService::filteredQuery()` (mesmo filtro da
+tela) e `::totals()` (mesmos totalizadores) — o endpoint de listagem, o CSV e
+o PDF nunca podem mostrar números diferentes para o mesmo filtro, porque é
+literalmente a mesma fonte.
+
+### CSV — streaming, nunca carrega tudo em memória
+
+`GET /api/reports/billing/export/csv` usa `response()->streamDownload()`
+escrevendo direto em `fopen('php://output', 'w')` via `fputcsv()`, percorrendo
+a query filtrada com `lazyById(1000)` (chunks por id, com eager load de
+`customer` preservado — ao contrário de `cursor()`, que não teria dado para
+usar aqui sem reintroduzir N+1). Nunca existe um array com todas as linhas
+em memória.
+
+**Conteúdo do arquivo**: escolhemos linhas de metadata (título, período,
+filtros aplicados, data de geração) no topo do próprio CSV, seguidas de uma
+linha em branco, cabeçalho da tabela, dados, outra linha em branco e uma
+seção "Totalizadores" ao final — tudo em um único arquivo, sem precisar de
+múltiplas abas/arquivos (CSV não suporta isso de qualquer forma). O trade-off
+é que uma ferramenta que espera "primeira linha = cabeçalho" precisa pular as
+5 linhas de metadata antes de importar como tabela pura — convenção comum em
+exports financeiros (extratos bancários costumam fazer o mesmo). Nome do
+arquivo reflete o período filtrado (`relatorio-faturamento_2025-01-01_a_2025-06-30.csv`)
+ou a data de geração quando não há filtro de período.
+
+**Números medidos** (MySQL, filtro `status=overdue`, 109.718 registros —
+bem acima dos "50.000+" pedidos):
+
+- **Isolado** (só a geração do CSV, sem o boot do framework nem I/O de rede —
+  `BillingReportExportService::writeCsv()` chamado diretamente): **~10,8s**,
+  pico de memória **~81 MB**. Memória não escala com o volume — é sempre o
+  tamanho de alguns chunks, nunca o dataset inteiro.
+- **HTTP fim-a-fim** (`php artisan serve`, mesma máquina): **~19s**. A
+  diferença (~8s) foi investigada, não só aceita: descartei rede Docker (um
+  arquivo estático de 13MB pelo mesmo túnel de porta baixa em 0,4s) e
+  descartei NAT host↔container (rodar o mesmo curl de *dentro* do container
+  deu o mesmo ~18s). Sobra o próprio `php artisan serve` — servidor de
+  desenvolvimento single-threaded, explicitamente não recomendado para
+  produção, com overhead conhecido em respostas longas/streamed. Ajustar o
+  intervalo de `flush()` de 1000 para 5000 linhas (menos idas à rede) já
+  recuperou ~4s sozinho. Em produção (PHP-FPM/nginx ou Octane), o número
+  isolado (~11s) é a estimativa mais realista.
+- Achado real ao medir: **cada chamada de `fputcsv()` sem o 5º parâmetro
+  (`$escape`) emite um deprecation warning no PHP 8.4**. Isso passou
+  despercebido até o export de ~11 mil linhas ter demorado 19s por causa só
+  disso — corrigido passando `$escape` explicitamente em todas as chamadas
+  (`writeCsvRow()`), o que sozinho derrubou esse caso de 19s para ~1,4s.
+
+### PDF — trava de volume por COUNT, nunca por tentativa e erro
+
+`GET /api/reports/billing/export/pdf` primeiro roda um `COUNT(*)` (nunca
+carrega os registros) sobre a query filtrada. Se o total exceder
+`config('reports.pdf_row_limit')` (default **500**, `REPORTS_PDF_ROW_LIMIT`
+no `.env`), retorna 422 com uma mensagem explicando o limite e sugerindo CSV
+— sem nunca chegar a instanciar o dompdf.
+
+**Por que 500, e não os "ex: 5000" do enunciado (só ilustrativo):** medimos.
+dompdf (biblioteca instalada: `barryvdh/laravel-dompdf`) escala memória de
+forma muito pior que linear para tabelas grandes:
+
+| Linhas | Pico de memória |
+|-------:|----------------:|
+|    100 |          ~76 MB |
+|    300 |         ~137 MB |
+|    500 |         ~223 MB |
+|  1.000 |         ~499 MB |
+|  2.000 | **estoura mesmo com limite de 1 GB** |
+
+500 é o maior valor testado com margem confortável dentro dos 512 MB de
+`memory_limit` que a rota eleva especificamente para si mesma (só para essa
+requisição pontual e sempre bounded — nunca o processo inteiro nem outras
+requisições, ver `BillingReportExportController::pdf()`). 1.000 já fica
+perto demais do limite para sobreviver a conteúdo real mais longo (nomes/
+descrições maiores que os dados de teste). Isso confirma na prática o que o
+enunciado já antecipava: PDF é inerentemente mais caro de renderizar (layout
+de página, fontes, paginação) e menos útil como documento de leitura em
+volumes grandes — ninguém lê um PDF de dezenas de milhares de linhas, e a
+biblioteca nem sequer consegue gerar um de forma confiável. CSV é a resposta
+correta para volume; PDF é para relatórios pequenos/pontuais que alguém vai
+efetivamente imprimir ou anexar a um e-mail.
+
+### Melhorias adicionais possíveis em produção
+
+- Exportação assíncrona (job em fila + notificação/e-mail com link para
+  download) para o CSV de volumes muito grandes, evitando manter uma conexão
+  HTTP síncrona aberta por dezenas de segundos.
+- Servir o backend via PHP-FPM/nginx ou Laravel Octane em vez de
+  `artisan serve`, eliminando o overhead de boot por requisição observado
+  em todos os endpoints deste projeto (não só nos relatórios).
+- Cache de contagem para o limite do PDF em filtros muito repetidos (o
+  `COUNT(*)` já é rápido graças aos índices compostos, mas evitar refazê-lo
+  a cada tentativa de export do mesmo filtro é possível).
 Tempo medido: ~500.000 cobranças em ~35-40s de trabalho real de geração.
