@@ -117,3 +117,10 @@ da tela de edição (que busca e exibe o registro completo), em vez de uma rota
 somente-leitura separada. Justificativa: o formulário de edição já cobre a
 necessidade de visualização sem duplicar UI. Uma tela /clientes/[id] read-only
 separada é um possível follow-up se sobrar tempo.
+
+## Decisão: status 'cancelled' não é alcançável via API
+
+O schema e o InterestCalculatorService suportam status 'cancelled' (juros não
+acumulam), mas não há endpoint de cancelamento — não é uma funcionalidade
+pedida no escopo do teste. Implementado de forma defensiva para o caso de
+uma futura extensão (ex: cancelamento manual via admin/seeder).

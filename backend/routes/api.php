@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CustomerController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,5 +15,10 @@ Route::middleware('auth:sanctum')->group(function () {
         'index', 'show', 'store', 'update',
     ]);
 
-    // demais rotas protegidas (billings, reports) entram aqui depois
+    Route::apiResource('billings', BillingController::class)->only([
+        'index', 'show', 'store', 'update',
+    ]);
+    Route::post('billings/{billing}/pay', [BillingController::class, 'pay']);
+
+    // demais rotas protegidas (reports) entram aqui depois
 });
