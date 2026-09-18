@@ -470,6 +470,17 @@ Estratégia: inserts em lote (chunks de 1000) via DB::table()->insert(), sem
 instanciar models Eloquent por registro — evita overhead de eventos/observers
 e viabiliza a geração de centenas de milhares de registros em segundos.
 
+`php artisan db:seed` (ou `migrate:fresh --seed`) sozinho já deixa a aplicação
+navegável — `DatabaseSeeder` chama `VolumeSeeder::run(billingCount: 300)`
+depois do `UserSeeder`, reaproveitando exatamente o mesmo método usado por
+`db:seed:volume` (não uma segunda implementação da geração de dados; só um
+`$billingCount` bem menor por padrão). `VolumeSeeder::run()` já aceitava um
+parâmetro programaticamente antes disso — não precisou de nenhuma mudança de
+assinatura, só passar `['billingCount' => 300]` no `$this->call()`. Medido:
+`migrate:fresh --seed` do zero, 1.000 clientes + 300 cobranças geradas em
+~1,3s de trabalho real de seed (o restante do tempo de wall-clock é
+drop+migrate+boot do framework, não o seeding em si).
+
 ## Relatório de faturamento — total de juros (decisão técnica)
 
 Juros não é uma coluna persistida: para uma cobrança vencida e não paga, o
