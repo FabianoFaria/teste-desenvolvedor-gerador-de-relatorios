@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Receipt, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, LayoutDashboard, Receipt, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -15,6 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/cobrancas", label: "Cobranças", icon: Receipt },
+  { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 
 export function AppSidebar() {

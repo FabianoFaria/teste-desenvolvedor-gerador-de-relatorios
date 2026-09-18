@@ -26,13 +26,15 @@ export function BillingAmountSummary({
   );
 }
 
-interface AmountBlockProps {
+export interface AmountBlockProps {
   label: string;
   value: number;
   emphasis?: "neutral" | "warning" | "strong";
 }
 
-function AmountBlock({ label, value, emphasis = "neutral" }: AmountBlockProps) {
+// Exportado para reuso fora do layout fixo de 3 colunas acima (ex: o card de
+// totalizadores do relatório, que tem mais campos que só original/juros/atualizado).
+export function AmountBlock({ label, value, emphasis = "neutral" }: AmountBlockProps) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs text-muted-foreground">{label}</span>
