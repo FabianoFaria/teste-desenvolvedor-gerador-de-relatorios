@@ -16,8 +16,8 @@ use Carbon\CarbonInterface;
  * O valor atualizado é sempre calculado em tempo real a partir daqui e NUNCA
  * persistido como verdade no banco (só valor pago e juros no momento do
  * pagamento são gravados ao registrar um pagamento). Nenhum outro lugar do
- * código — listagem, tela de cobrança, relatório, exportações — deve
- * reimplementar essa fórmula; todos devem chamar este service.
+ * código — listagem, tela de cobrança, relatório, exportações, seeders de
+ * volume — deve reimplementar essa fórmula; todos devem chamar este service.
  */
 class InterestCalculatorService
 {
@@ -46,18 +46,58 @@ class InterestCalculatorService
             in_array($billing->status, ['paid', 'cancelled'], true)
             || $dueDate->greaterThanOrEqualTo($referenceDate)
         ) {
-            return [
-                'original_amount' => $originalAmount,
-                'interest_amount' => 0.0,
-                'updated_amount' => $originalAmount,
-                'days_overdue' => 0,
-            ];
+            return $this->flatResult($originalAmount);
         }
 
         // diffInDays() retorna float nesta versão do Carbon; dias em atraso
         // é sempre um número inteiro de dias.
         $daysOverdue = (int) abs($referenceDate->diffInDays($dueDate));
-        $monthlyRate = (float) $billing->monthly_interest_rate / 100;
+
+        return $this->compound($originalAmount, (float) $billing->monthly_interest_rate, $daysOverdue);
+    }
+
+    /**
+     * Mesma fórmula acima, mas a partir de valores primitivos em vez de uma
+     * instância de Billing — usada por processos em lote (ex: VolumeSeeder)
+     * que não podem pagar o custo de instanciar um Eloquent model por linha
+     * ao gerar centenas de milhares de registros. Não duplica a fórmula: só
+     * pula a etapa de extrair os primitivos de um model.
+     *
+     * @param  int  $daysOverdue  Já calculado pelo chamador (ex: diferença
+     *                            entre due_date e a data de referência/pagamento). Pass 0 para uma
+     *                            cobrança ainda não vencida ou já paga/cancelada.
+     * @return array{
+     *     original_amount: float,
+     *     interest_amount: float,
+     *     updated_amount: float,
+     *     days_overdue: int,
+     * }
+     */
+    public function calculateFromValues(
+        float $originalAmount,
+        float $monthlyInterestRate,
+        int $daysOverdue
+    ): array {
+        $originalAmount = round($originalAmount, 2);
+
+        if ($daysOverdue <= 0) {
+            return $this->flatResult($originalAmount);
+        }
+
+        return $this->compound($originalAmount, $monthlyInterestRate, $daysOverdue);
+    }
+
+    /**
+     * @return array{
+     *     original_amount: float,
+     *     interest_amount: float,
+     *     updated_amount: float,
+     *     days_overdue: int,
+     * }
+     */
+    private function compound(float $originalAmount, float $monthlyInterestRate, int $daysOverdue): array
+    {
+        $monthlyRate = $monthlyInterestRate / 100;
 
         $updatedAmount = round($originalAmount * (1 + $monthlyRate) ** ($daysOverdue / 30), 2);
 
@@ -71,6 +111,24 @@ class InterestCalculatorService
             'interest_amount' => $interestAmount,
             'updated_amount' => $updatedAmount,
             'days_overdue' => $daysOverdue,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     original_amount: float,
+     *     interest_amount: float,
+     *     updated_amount: float,
+     *     days_overdue: int,
+     * }
+     */
+    private function flatResult(float $originalAmount): array
+    {
+        return [
+            'original_amount' => $originalAmount,
+            'interest_amount' => 0.0,
+            'updated_amount' => $originalAmount,
+            'days_overdue' => 0,
         ];
     }
 }

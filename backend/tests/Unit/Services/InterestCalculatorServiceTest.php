@@ -122,4 +122,36 @@ class InterestCalculatorServiceTest extends TestCase
         $this->assertSame(0.0, $result['interest_amount']);
         $this->assertSame(1000.0, $result['updated_amount']);
     }
+
+    public function test_calculate_from_values_matches_calculate_for_the_same_inputs(): void
+    {
+        // calculateFromValues() existe para lotes (VolumeSeeder) evitarem
+        // instanciar um Billing por linha — precisa produzir exatamente o
+        // mesmo resultado que calculate() para os mesmos dados, já que é a
+        // mesma fórmula por baixo.
+        $billing = new Billing([
+            'original_amount' => 1000.00,
+            'monthly_interest_rate' => 2.5,
+            'due_date' => Carbon::parse('2026-08-19'),
+            'status' => 'overdue',
+        ]);
+
+        $service = new InterestCalculatorService;
+
+        $viaModel = $service->calculate($billing, Carbon::parse('2026-09-18'));
+        $viaValues = $service->calculateFromValues(1000.00, 2.5, 30);
+
+        $this->assertSame($viaModel, $viaValues);
+        $this->assertSame(1025.0, $viaValues['updated_amount']);
+        $this->assertSame(25.0, $viaValues['interest_amount']);
+    }
+
+    public function test_calculate_from_values_with_zero_days_overdue_returns_original_amount(): void
+    {
+        $result = (new InterestCalculatorService)->calculateFromValues(1000.00, 2.5, 0);
+
+        $this->assertSame(0.0, $result['interest_amount']);
+        $this->assertSame(1000.0, $result['updated_amount']);
+        $this->assertSame(0, $result['days_overdue']);
+    }
 }

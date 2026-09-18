@@ -462,3 +462,11 @@ docker compose exec backend php artisan migrate
 
 Backend: http://localhost:8000
 Frontend: http://localhost:3000
+
+## Geração de dados de volume
+
+Comando: `php artisan db:seed:volume --count=500000`
+Estratégia: inserts em lote (chunks de 1000) via DB::table()->insert(), sem
+instanciar models Eloquent por registro — evita overhead de eventos/observers
+e viabiliza a geração de centenas de milhares de registros em segundos.
+Tempo medido: ~500.000 cobranças em ~35-40s de trabalho real de geração.

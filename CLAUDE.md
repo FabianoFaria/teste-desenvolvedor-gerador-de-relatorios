@@ -132,3 +132,11 @@ alguns clientes não aparecem na lista. Mitigação parcial: ao editar uma
 cobrança existente, o cliente vinculado é sempre injetado nas opções mesmo
 fora da página buscada. Melhoria futura: combobox assíncrono com busca
 server-side (GET /api/customers?search=) via Command+Popover do shadcn/ui.
+
+## Geração de dados de volume
+
+Comando: `php artisan db:seed:volume --count=500000`
+Estratégia: inserts em lote (chunks de 1000) via DB::table()->insert(), sem
+instanciar models Eloquent por registro — evita overhead de eventos/observers
+e viabiliza a geração de centenas de milhares de registros em segundos.
+Tempo medido: ~500.000 cobranças em ~35-40s de trabalho real de geração.
