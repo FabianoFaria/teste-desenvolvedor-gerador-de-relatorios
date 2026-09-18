@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { InlineAlert } from "@/components/inline-alert";
 import { useAuth } from "@/lib/auth/auth-context";
+import { maskDocument } from "@/lib/masks";
 import {
   createCustomer,
   updateCustomer,
@@ -55,7 +56,9 @@ export function CustomerForm(props: CustomerFormProps) {
     mode === "edit"
       ? {
           name: props.customer.name,
-          document: props.customer.document,
+          // Idempotente para um valor já formatado — reforça a máscara
+          // mesmo num registro legado que porventura não tenha pontuação.
+          document: maskDocument(props.customer.document),
           email: props.customer.email,
           status: props.customer.status,
         }
@@ -178,8 +181,10 @@ export function CustomerForm(props: CustomerFormProps) {
         <Label htmlFor="document">Documento (CPF ou CNPJ)</Label>
         <Input
           id="document"
+          inputMode="numeric"
+          placeholder="000.000.000-00"
           value={documentNumber}
-          onChange={(event) => setDocumentNumber(event.target.value)}
+          onChange={(event) => setDocumentNumber(maskDocument(event.target.value))}
           aria-invalid={Boolean(fieldErrors.document)}
           disabled={isSubmitting}
         />

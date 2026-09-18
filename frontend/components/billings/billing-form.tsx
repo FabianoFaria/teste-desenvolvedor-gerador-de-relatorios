@@ -16,6 +16,7 @@ import {
 import { InlineAlert } from "@/components/inline-alert";
 import { useAuth } from "@/lib/auth/auth-context";
 import { listCustomers } from "@/lib/api/customers";
+import { formatCurrencyInput, formatPercentageInput, parseTwoDecimalInput } from "@/lib/masks";
 import {
   createBilling,
   updateBilling,
@@ -63,18 +64,18 @@ export function BillingForm(props: BillingFormProps) {
       ? {
           customerId: props.billing.customer_id as number | null,
           description: props.billing.description,
-          originalAmount: String(props.billing.original_amount),
+          originalAmount: props.billing.original_amount,
           issueDate: props.billing.issue_date,
           dueDate: props.billing.due_date,
-          monthlyInterestRate: String(props.billing.monthly_interest_rate),
+          monthlyInterestRate: props.billing.monthly_interest_rate,
         }
       : {
           customerId: null as number | null,
           description: "",
-          originalAmount: "",
+          originalAmount: 0,
           issueDate: "",
           dueDate: "",
-          monthlyInterestRate: "",
+          monthlyInterestRate: 0,
         };
 
   const [customerId, setCustomerId] = useState(initialValues.customerId);
@@ -157,14 +158,12 @@ export function BillingForm(props: BillingFormProps) {
       nextErrors.description = "Informe a descrição.";
     }
 
-    const amount = Number(originalAmount);
-    if (!originalAmount.trim() || Number.isNaN(amount) || amount <= 0) {
+    // originalAmount/monthlyInterestRate vêm da máscara (parseTwoDecimalInput),
+    // que nunca produz negativo nem NaN — só resta checar o mínimo exigido
+    // pelo backend. Taxa de juros aceita 0 (sem juros), então não há mais
+    // nada a validar nela: a máscara já garante um número válido sempre.
+    if (originalAmount <= 0) {
       nextErrors.original_amount = "Informe um valor maior que zero.";
-    }
-
-    const rate = Number(monthlyInterestRate);
-    if (monthlyInterestRate.trim() === "" || Number.isNaN(rate) || rate < 0) {
-      nextErrors.monthly_interest_rate = "Informe uma taxa de juros válida (0 ou maior).";
     }
 
     if (!issueDate) {
@@ -196,10 +195,10 @@ export function BillingForm(props: BillingFormProps) {
       const payload: BillingPayload = {
         customer_id: customerId,
         description,
-        original_amount: Number(originalAmount),
+        original_amount: originalAmount,
         issue_date: issueDate,
         due_date: dueDate,
-        monthly_interest_rate: Number(monthlyInterestRate),
+        monthly_interest_rate: monthlyInterestRate,
       };
 
       const response =
@@ -292,12 +291,10 @@ export function BillingForm(props: BillingFormProps) {
           <Label htmlFor="original_amount">Valor original</Label>
           <Input
             id="original_amount"
-            type="number"
-            min="0.01"
-            step="0.01"
+            type="text"
             inputMode="decimal"
-            value={originalAmount}
-            onChange={(event) => setOriginalAmount(event.target.value)}
+            value={formatCurrencyInput(originalAmount)}
+            onChange={(event) => setOriginalAmount(parseTwoDecimalInput(event.target.value))}
             aria-invalid={Boolean(fieldErrors.original_amount)}
             disabled={isSubmitting}
           />
@@ -307,15 +304,13 @@ export function BillingForm(props: BillingFormProps) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="monthly_interest_rate">Taxa de juros mensal (%)</Label>
+          <Label htmlFor="monthly_interest_rate">Taxa de juros mensal</Label>
           <Input
             id="monthly_interest_rate"
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
             inputMode="decimal"
-            value={monthlyInterestRate}
-            onChange={(event) => setMonthlyInterestRate(event.target.value)}
+            value={formatPercentageInput(monthlyInterestRate)}
+            onChange={(event) => setMonthlyInterestRate(parseTwoDecimalInput(event.target.value))}
             aria-invalid={Boolean(fieldErrors.monthly_interest_rate)}
             disabled={isSubmitting}
           />

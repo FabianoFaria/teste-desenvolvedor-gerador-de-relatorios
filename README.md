@@ -631,3 +631,68 @@ efetivamente imprimir ou anexar a um e-mail.
   `COUNT(*)` já é rápido graças aos índices compostos, mas evitar refazê-lo
   a cada tentativa de export do mesmo filtro é possível).
 Tempo medido: ~500.000 cobranças em ~35-40s de trabalho real de geração.
+
+## Máscaras de input (Cliente/Cobrança)
+
+### Formato de persistência do documento (CPF/CNPJ)
+
+Antes de decidir como mascarar, verifiquei o que já está gravado: todos os
+registros existentes (`CustomerFactory`, `VolumeSeeder`, dados reais no MySQL
+local) persistem `document` **com pontuação** (`000.625.630-92`,
+`00.414.141/0001-50`) — nenhuma divergência entre as fontes. Não havia
+ambiguidade real depois de checar, então o formulário mantém essa mesma
+convenção: o estado do campo já é a string mascarada, é exatamente isso que
+vai no `PUT`/`POST` para a API, sem um segundo formato "puro" por trás disso
+(diferente de moeda/percentual, onde o valor real e a máscara são coisas
+distintas — ver abaixo).
+
+### Biblioteca vs. funções puras
+
+Nenhuma biblioteca de máscara (react-input-mask, imask etc.) foi adicionada.
+Os três casos aqui — CPF/CNPJ, moeda BRL, percentual — são padrões fixos e
+simples o bastante (inserir separadores em posições calculadas a partir da
+contagem de dígitos) para não justificar uma nova dependência: mais bundle,
+mais uma API para aprender, e bibliotecas de máscara de input têm histórico
+conhecido de bugs de posição de cursor que uma função pura não tem porque não
+mexe com o DOM diretamente. Implementado como funções puras em
+`frontend/lib/masks.ts` — sem estado, sem efeito colateral, testáveis sem
+montar nenhum componente.
+
+- `maskDocument(rawValue)`: detecta CPF (≤ 11 dígitos) vs CNPJ (> 11 dígitos)
+  dinamicamente enquanto o usuário digita e retorna a string já formatada
+  (é isso que é enviado à API, ver acima). Não valida dígito verificador —
+  fora de escopo, só formatação.
+- `parseTwoDecimalInput(rawValue)` + `formatCurrencyInput`/`formatPercentageInput`:
+  masking "cents-first" (padrão comum em input de dinheiro BR — os dígitos
+  digitados são sempre a parte decimal, ex: "1234" vira 12,34) para
+  `original_amount` e `monthly_interest_rate`. O estado do componente guarda
+  o **número real** (`1234.56`, não a string mascarada); a máscara é só
+  como esse número é exibido no input a cada render. `formatCurrencyInput`
+  reaproveita o `formatCurrency` já usado no resto do app (tabelas, relatório),
+  para o campo de valor no formulário não introduzir um formato diferente do
+  que já aparece em toda parte. Como o parsing extrai só dígitos com regex, é
+  estruturalmente impossível digitar um caractere não numérico ou um valor
+  negativo — não é uma validação a mais, é uma garantia do próprio parsing.
+
+Aplicado em `CustomerForm` (documento) e `BillingForm` (valor original, taxa
+de juros) — como as telas de cadastro/edição de cobrança compartilham o
+`BillingForm`, uma única mudança cobriu `/cobrancas/nova` e
+`/cobrancas/[id]/editar` ao mesmo tempo.
+
+### Testes de frontend (setup novo)
+
+O projeto não tinha nenhum test runner no frontend. Como as funções de
+`lib/masks.ts` são puras (sem DOM, sem componente para montar), o custo de
+adicionar um runner só para isso é baixo — usei Vitest (compatível com o
+`@types/node` `^20` já declarado; a versão mais nova exige `>=22`, então
+fixei em `^3.2.7`) rodando em ambiente `node` puro, sem jsdom/Testing Library,
+porque nada aqui precisa de DOM. `npm run test` roda os 14 casos em
+`lib/masks.test.ts` (mask progressivo de CPF/CNPJ dígito a dígito, transição
+para CNPJ ao digitar o 12º dígito, parsing ida-e-volta com a formatação).
+Isso conta como o "diferencial" de testes de frontend citado no README do
+teste — decidi que valia o investimento porque o setup ficou mínimo (só
+`vitest` + um config de 15 linhas) e porque testar essas funções manualmente
+via browser a cada mudança seria mais lento que rodar `npm run test`.
+Testar os componentes de formulário em si (render + digitação simulada) não
+foi feito — exigiria jsdom/Testing Library, um passo a mais que não foi
+justificado só para validar chamadas de função já cobertas isoladamente.
