@@ -18,6 +18,11 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+# Cache intermediário do scribe:generate, nunca lido em runtime pela rota
+# /docs (essa serve resources/views/scribe/, já commitado). Regenerável a
+# qualquer momento e pode conter o token real usado pelo ResponseCalls nos
+# headers de exemplo capturados — nunca deve ir para o repositório.
+/.scribe
 /storage/*.key
 /storage/pail
 /vendor

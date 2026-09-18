@@ -463,6 +463,38 @@ docker compose exec backend php artisan migrate
 Backend: http://localhost:8000
 Frontend: http://localhost:3000
 
+## Documentação da API (Scribe)
+
+Com o `docker compose up` já rodando, a documentação interativa está em
+**http://localhost:8000/docs** — nenhuma configuração adicional é necessária,
+o pacote (`knuckleswtf/scribe`) já vem instalado e a documentação já gerada
+faz parte do repositório.
+
+Rotas organizadas em 4 grupos (Autenticação, Clientes, Cobranças,
+Relatórios). Todas exigem Bearer token exceto `POST /login`. Para usar o
+botão **Try It Out** direto no navegador: faça login pela própria página de
+docs (endpoint `POST /login`, usuário de teste criado pelo `UserSeeder` —
+`admin@teste.com` / `password`) ou gere um token via tinker, depois clique
+em **Authorization** no topo da página e cole o token — as chamadas passam a
+ir contra a API real rodando no container.
+
+A maior parte das anotações (parâmetros de URL, corpo, respostas de
+sucesso/erro) foi extraída automaticamente pelo Scribe a partir das rotas,
+Form Requests e API Resources já existentes — sem duplicar informação que já
+está no código. Anotações manuais (via atributos PHP 8 `#[BodyParam]`,
+`#[QueryParam]`, `#[Group]`, no mesmo estilo já usado no projeto para
+`#[Fillable]`/`#[Signature]`) foram adicionadas só onde a regra de validação
+sozinha não é autoexplicativa — por exemplo, o significado de cada valor de
+`date_field` no relatório (`issue_date`/`due_date`/`payment_date`) ou que
+`monthly_interest_rate` é percentual (2.5 = 2,5% ao mês), não fração
+decimal.
+
+Para regenerar a documentação depois de alterar rotas/Form Requests:
+
+```bash
+docker compose exec backend php artisan scribe:generate
+```
+
 ## Geração de dados de volume
 
 Comando: `php artisan db:seed:volume --count=500000`
