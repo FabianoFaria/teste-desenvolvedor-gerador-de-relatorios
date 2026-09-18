@@ -109,3 +109,11 @@ um refresh de página (F5) desloga o usuário. Essa é uma escolha deliberada
 para reduzir superfície de ataque XSS. Uma melhoria futura seria usar cookie
 httpOnly setado pelo backend, o que manteria a sessão através de refreshes
 sem expor o token ao JavaScript do client.
+
+## Decisão: tela de visualização de cliente
+
+A funcionalidade "visualizar os dados de um cliente" foi implementada através
+da tela de edição (que busca e exibe o registro completo), em vez de uma rota
+somente-leitura separada. Justificativa: o formulário de edição já cobre a
+necessidade de visualização sem duplicar UI. Uma tela /clientes/[id] read-only
+separada é um possível follow-up se sobrar tempo.
