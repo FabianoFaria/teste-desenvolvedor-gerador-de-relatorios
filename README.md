@@ -469,4 +469,70 @@ Comando: `php artisan db:seed:volume --count=500000`
 Estratégia: inserts em lote (chunks de 1000) via DB::table()->insert(), sem
 instanciar models Eloquent por registro — evita overhead de eventos/observers
 e viabiliza a geração de centenas de milhares de registros em segundos.
+
+## Relatório de faturamento — total de juros (decisão técnica)
+
+Juros não é uma coluna persistida: para uma cobrança vencida e não paga, o
+valor atualizado depende de "hoje" e é calculado sob demanda
+(`InterestCalculatorService`). Isso é trivial por linha, mas o relatório
+também precisa de um **totalizador de juros sobre todo o conjunto filtrado**
+(não só a página exibida) — potencialmente centenas de milhares/milhões de
+linhas — sem carregar esse volume inteiro em memória.
+
+**Opções avaliadas:**
+
+1. **Loop em PHP via `chunk()`/`cursor()`**, chamando
+   `InterestCalculatorService::calculate()` linha a linha e somando.
+   100% idêntico ao valor exibido por linha (é literalmente a mesma
+   chamada), mas o tempo de resposta escala linearmente com o volume: para
+   um filtro amplo (ex: "todas as cobranças", sem período), isso lê da
+   tabela inteira, linha por linha, para o PHP.
+2. **Expressão SQL replicando a fórmula composta, agregada com `SUM()` numa
+   única query** (`ROUND(original_amount * POWER(1 + taxa/100, dias/30), 2)
+   - original_amount`, dentro de um `CASE` por status). O banco resolve tudo
+   internamente — o tempo de resposta deixa de ser proporcional ao número de
+   linhas e passa a depender só da seletividade dos índices já existentes.
+   Trade-off: é uma segunda implementação da fórmula (em SQL), com risco de
+   divergir do `InterestCalculatorService` se a regra mudar.
+3. **Pré-computar/cachear o total** (coluna materializada, job agendado).
+   Rejeitada: juros muda todo dia, para toda cobrança vencida, mesmo sem
+   nenhuma escrita — qualquer cache ficaria desatualizado diariamente,
+   contrariando o requisito de "juros sempre em tempo real, nunca
+   persistido como verdade".
+
+**Escolhida: opção 2.** Este projeto prioriza explicitamente performance em
+escala (requisito de "tabelas com milhões de registros") sobre garantia
+absoluta de paridade ao centavo numa tela de relatório específica. Mitigação
+do risco de divergência:
+
+- A expressão SQL replica a mesma sequência de arredondamento do PHP
+  (arredonda o valor atualizado primeiro, juros = atualizado − original
+  depois — nunca arredondando os dois lados separadamente), então os dois
+  caminhos batem ao centavo na esmagadora maioria dos casos.
+- Cobranças **pagas** não usam a fórmula em SQL — o total nesse caso soma
+  `interest_amount_at_payment` (snapshot histórico já persistido), que é
+  exato, sem aproximação nenhuma.
+- Toda a duplicação fica isolada em um único método privado
+  (`BillingReportService::liveInterestSql()`), não espalhada pelo código.
+- Coberto por teste comparando o total retornado pela API com um cálculo
+  manual esperado (`BillingReportControllerTest::test_totals_match_manual_calculation_for_known_records`).
+
+Se exatidão ao centavo contra auditoria virar um requisito inegociável, a
+opção 1 deve substituir esta, aceitando o custo de performance em filtros
+muito amplos.
+
+**Números medidos** (MySQL, 550.000 cobranças, 2.000 clientes — ambiente
+Docker local):
+
+- Totalizadores sobre as 550k linhas sem nenhum filtro (pior caso): **~0,53s**.
+- Totalizadores + página paginada juntos: **~1,0s**, pico de memória **~38,5 MB**
+  (não escala com o volume — não há hidratação de model para o agregado).
+- `EXPLAIN` de uma query filtrada por `status + due_date` confirma uso do
+  índice composto `billings_status_due_date_index` (`type: range`,
+  `Extra: Using index`), não table scan.
+- O tempo de resposta HTTP fim-a-fim observado (~4–9s) é dominado pelo boot
+  do `php artisan serve` a cada request (mesmo um endpoint trivial como
+  `/api/me` leva ~3,3s) — não pelo relatório em si. Em produção (PHP-FPM ou
+  Octane, sem reboot do framework por requisição), esse overhead fixo
+  desaparece e o tempo de resposta tende ao custo medido acima (~1s).
 Tempo medido: ~500.000 cobranças em ~35-40s de trabalho real de geração.

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\BillingReportController;
 use App\Http\Controllers\CustomerController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,5 +21,5 @@ Route::middleware('auth:sanctum')->group(function () {
     ]);
     Route::post('billings/{billing}/pay', [BillingController::class, 'pay']);
 
-    // demais rotas protegidas (reports) entram aqui depois
+    Route::get('reports/billing', [BillingReportController::class, 'billing']);
 });
